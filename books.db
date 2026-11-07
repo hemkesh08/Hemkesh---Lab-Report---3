@@ -1,0 +1,19 @@
+CREATE TABLE book (
+    id INTEGER PRIMARY KEY,
+    title TEXT,
+    author TEXT,
+    price INTEGER,
+    pages INTEGER
+);
+
+INSERT INTO book (title, author, price, pages) VALUES
+('The Alchemist', 'Paulo Coelho', 250, 208),
+('Atomic Habits', 'James Clear', 350, 320),
+('Wings of Fire', 'A.P.J. Abdul Kalam', 300, 180),
+('Ikigai', 'Hector Garcia', 280, 194),
+('Deep Work', 'Cal Newport', 400, 296),
+('Rich Dad Poor Dad', 'Robert Kiyosaki', 320, 336),
+('The Power of Habit', 'Charles Duhigg', 375, 371),
+('Think and Grow Rich', 'Napoleon Hill', 290, 238),
+('The Psychology of Money', 'Morgan Housel', 330, 256),
+('Clean Code', 'Robert C. Martin', 450, 464);
