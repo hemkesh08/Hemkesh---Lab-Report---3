@@ -2,6 +2,7 @@ const express = require('express');
 const { open } = require('sqlite');
 const sqlite3 = require('sqlite3');
 const path = require('path');
+const fs = require('fs');
 
 const app = express();
 app.use(express.json());
@@ -14,17 +15,38 @@ const dbPath = path.join(__dirname, 'books.db');
 
 let db = null;
 
-// Initialize database and start server
+// Ensure the SQLite file exists and has the proper schema
+const ensureDatabase = async () => {
+  const exists = fs.existsSync(dbPath);
+  db = await open({
+    filename: dbPath,
+    driver: sqlite3.Database,
+  });
+
+  // Create the table if this is a fresh DB
+  if (!exists) {
+    const createTableSQL = `
+      CREATE TABLE IF NOT EXISTS book (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        title TEXT NOT NULL,
+        author TEXT NOT NULL,
+        price REAL NOT NULL,
+        pages INTEGER DEFAULT 0
+      );
+    `;
+    await db.exec(createTableSQL);
+    console.log('Database initialized with books table');
+  }
+};
+
+// Initialize DB then start server
 const initializeDBAndServer = async () => {
   try {
-    db = await open({
-      filename: dbPath,
-      driver: sqlite3.Database,
-    });
+    await ensureDatabase();
 
-    const server = app.listen(PORT, () => {
-      console.log(`Server running on port ${PORT}`);
-    });
+    const server = app.listen(PORT, () =>
+      console.log(`Server running on port ${PORT}`)
+    );
 
     server.on('error', (error) => {
       if (error.code === 'EADDRINUSE') {
@@ -34,7 +56,6 @@ const initializeDBAndServer = async () => {
       } else {
         console.error(`Server error: ${error.message}`);
       }
-
       process.exit(1);
     });
   } catch (error) {
@@ -61,10 +82,10 @@ app.get('/books/', async (request, response) => {
       search_q = '',
       min_price,
       max_price,
-    } = request.query
+    } = request.query;
 
-    const limitValue = Number(limit)
-    const offsetValue = Number(offset)
+    const limitValue = Number(limit);
+    const offsetValue = Number(offset);
 
     if (
       !Number.isInteger(limitValue) ||
@@ -74,52 +95,52 @@ app.get('/books/', async (request, response) => {
     ) {
       return response.status(400).json({
         error: 'Invalid limit or offset',
-      })
+      });
     }
 
-    const sortOrder = order.toUpperCase()
+    const sortOrder = order.toUpperCase();
 
     if (!['ASC', 'DESC'].includes(sortOrder)) {
       return response.status(400).json({
         error: 'Order must be ASC or DESC',
-      })
+      });
     }
 
-    const allowedColumns = ['id', 'title', 'author', 'price', 'pages']
+    const allowedColumns = ['id', 'title', 'author', 'price', 'pages'];
 
     if (!allowedColumns.includes(order_by)) {
       return response.status(400).json({
         error: 'Invalid order_by column',
-      })
+      });
     }
 
-    const conditions = ['title LIKE ?']
-    const queryParams = [`%${search_q}%`]
+    const conditions = ['title LIKE ?'];
+    const queryParams = [`%${search_q}%`];
 
     if (min_price !== undefined) {
-      const minPriceValue = Number(min_price)
+      const minPriceValue = Number(min_price);
 
       if (!Number.isFinite(minPriceValue) || minPriceValue < 0) {
         return response.status(400).json({
           error: 'min_price must be a valid non-negative number',
-        })
+        });
       }
 
-      conditions.push('price >= ?')
-      queryParams.push(minPriceValue)
+      conditions.push('price >= ?');
+      queryParams.push(minPriceValue);
     }
 
     if (max_price !== undefined) {
-      const maxPriceValue = Number(max_price)
+      const maxPriceValue = Number(max_price);
 
       if (!Number.isFinite(maxPriceValue) || maxPriceValue < 0) {
         return response.status(400).json({
           error: 'max_price must be a valid non-negative number',
-        })
+        });
       }
 
-      conditions.push('price <= ?')
-      queryParams.push(maxPriceValue)
+      conditions.push('price <= ?');
+      queryParams.push(maxPriceValue);
     }
 
     if (
@@ -129,7 +150,7 @@ app.get('/books/', async (request, response) => {
     ) {
       return response.status(400).json({
         error: 'min_price cannot be greater than max_price',
-      })
+      });
     }
 
     const getBooksQuery = `
@@ -138,58 +159,58 @@ app.get('/books/', async (request, response) => {
       WHERE ${conditions.join(' AND ')}
       ORDER BY ${order_by} ${sortOrder}
       LIMIT ? OFFSET ?;
-    `
+    `;
 
-    queryParams.push(limitValue, offsetValue)
+    queryParams.push(limitValue, offsetValue);
 
-    const booksArray = await db.all(getBooksQuery, queryParams)
+    const booksArray = await db.all(getBooksQuery, queryParams);
 
-    response.status(200).json(booksArray)
+    response.status(200).json(booksArray);
   } catch (error) {
-    console.error(`Error fetching books: ${error.message}`)
+    console.error(`Error fetching books: ${error.message}`);
     response.status(500).json({
       error: 'Internal Server Error',
-    })
+    });
   }
-})
+});
 
 // GET /books/:bookId/ - Get a book by ID
 app.get('/books/:bookId/', async (request, response) => {
   try {
-    const { bookId } = request.params
+    const { bookId } = request.params;
 
     const getBookQuery = `
       SELECT *
       FROM book
       WHERE id = ?;
-    `
+    `;
 
-    const book = await db.get(getBookQuery, [bookId])
+    const book = await db.get(getBookQuery, [bookId]);
 
     if (book === undefined) {
       return response.status(404).json({
         error: 'Book not found',
-      })
+      });
     }
 
-    response.status(200).json(book)
+    response.status(200).json(book);
   } catch (error) {
-    console.error(`Error fetching book: ${error.message}`)
+    console.error(`Error fetching book: ${error.message}`);
     response.status(500).json({
       error: 'Internal Server Error',
-    })
+    });
   }
-})
+});
 
 // POST /books/ - Add a new book
 app.post('/books/', async (request, response) => {
   try {
-    const { title, author, price, pages } = request.body
+    const { title, author, price, pages } = request.body;
 
     if (!title || !author || price === undefined || price === null) {
       return response.status(400).json({
         error: 'Title, author, and price are required',
-      })
+      });
     }
 
     if (
@@ -200,49 +221,49 @@ app.post('/books/', async (request, response) => {
     ) {
       return response.status(400).json({
         error: 'Title and author must be non-empty strings',
-      })
+      });
     }
 
     if (typeof price !== 'number' || !Number.isFinite(price) || price < 0) {
       return response.status(400).json({
         error: 'Price must be a valid non-negative number',
-      })
+      });
     }
 
     const addBookQuery = `
       INSERT INTO book (title, author, price, pages)
       VALUES (?, ?, ?, ?);
-    `
+    `;
 
     const dbResponse = await db.run(addBookQuery, [
       title.trim(),
       author.trim(),
       price,
       pages || 0,
-    ])
+    ]);
 
     response.status(201).json({
       message: 'Book added successfully',
       bookId: dbResponse.lastID,
-    })
+    });
   } catch (error) {
-    console.error(`Error adding book: ${error.message}`)
+    console.error(`Error adding book: ${error.message}`);
     response.status(500).json({
       error: 'Failed to add book',
-    })
+    });
   }
-})
+});
 
 // PUT /books/:bookId/ - Update a book
 app.put('/books/:bookId/', async (request, response) => {
   try {
-    const { bookId } = request.params
-    const { title, author, price, pages } = request.body
+    const { bookId } = request.params;
+    const { title, author, price, pages } = request.body;
 
     if (!title || !author || price === undefined || pages === undefined) {
       return response.status(400).json({
         error: 'Title, author, price, and pages are required',
-      })
+      });
     }
 
     if (
@@ -253,7 +274,7 @@ app.put('/books/:bookId/', async (request, response) => {
     ) {
       return response.status(400).json({
         error: 'Title and author must be non-empty strings',
-      })
+      });
     }
 
     if (
@@ -265,14 +286,14 @@ app.put('/books/:bookId/', async (request, response) => {
     ) {
       return response.status(400).json({
         error: 'Price must be non-negative and pages must be a positive integer',
-      })
+      });
     }
 
     const updateBookQuery = `
       UPDATE book
       SET title = ?, author = ?, price = ?, pages = ?
       WHERE id = ?;
-    `
+    `;
 
     const dbResponse = await db.run(updateBookQuery, [
       title.trim(),
@@ -280,52 +301,52 @@ app.put('/books/:bookId/', async (request, response) => {
       price,
       pages,
       bookId,
-    ])
+    ]);
 
     if (dbResponse.changes === 0) {
       return response.status(404).json({
         error: 'Book not found',
-      })
+      });
     }
 
     response.status(200).json({
       message: 'Book updated successfully',
-    })
+    });
   } catch (error) {
-    console.error(`Error updating book: ${error.message}`)
+    console.error(`Error updating book: ${error.message}`);
     response.status(500).json({
       error: 'Failed to update book',
-    })
+    });
   }
-})
+});
 
 // DELETE /books/:bookId/ - Delete a book
 app.delete('/books/:bookId/', async (request, response) => {
   try {
-    const { bookId } = request.params
+    const { bookId } = request.params;
 
     const deleteBookQuery = `
       DELETE FROM book
       WHERE id = ?;
-    `
+    `;
 
-    const dbResponse = await db.run(deleteBookQuery, [bookId])
+    const dbResponse = await db.run(deleteBookQuery, [bookId]);
 
     if (dbResponse.changes === 0) {
       return response.status(404).json({
         error: 'Book not found',
-      })
+      });
     }
 
     response.status(200).json({
       message: 'Book deleted successfully',
-    })
+    });
   } catch (error) {
-    console.error(`Error deleting book: ${error.message}`)
+    console.error(`Error deleting book: ${error.message}`);
     response.status(500).json({
       error: 'Failed to delete book',
-    })
+    });
   }
-})
-module.exports = app;
+});
 
+module.exports = app;
