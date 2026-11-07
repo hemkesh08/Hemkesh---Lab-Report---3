@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: hemkesh-lab-3
+    runtime: node
+    plan: free
+    branch: main
+    buildCommand: npm install --build-from-source=sqlite3
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
