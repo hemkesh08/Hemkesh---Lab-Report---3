@@ -12,7 +12,7 @@ https://hemkesh-lab-3.onrender.com/
 | Registration Number | 252U1R5034                       |
 | Section             | 106 AIDE-2A                      |
 | Course              | Backend Development Fundamentals |
-
+| Course              | Mr. Chintakrindi Sai Siva Teja Sir |
 ---
 
 ## 1. Project Overview
